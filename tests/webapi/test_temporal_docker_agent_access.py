@@ -140,7 +140,7 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
         assert api_server.started, "synthetic internal API did not start"
 
         probe_path = "tests/security/docker_agent_probe.py"
-        result = subprocess.run(docker + [
+        result = await asyncio.to_thread(subprocess.run, docker + [
             "run", "--rm", "--network", "host",
             "-e", f"TEMPORAL_ADDRESS=127.0.0.1:{temporal_port}",
             "-e", "VIGILO_INTERNAL_API_URL=http://127.0.0.1:8081",
