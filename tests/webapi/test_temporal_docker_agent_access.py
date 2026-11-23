@@ -93,8 +93,8 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
     try:
         subprocess.run(docker + [
             "run", "-d", "--name", temporal_name, "--network", "host",
-            TEMPORAL_IMAGE, "server", "start-dev", "--db-filename",
-            "/home/temporal/temporal.db", "--ip", "0.0.0.0",
+            TEMPORAL_IMAGE, "server", "start-dev", "--port", str(temporal_port),
+            "--db-filename", "/home/temporal/temporal.db", "--ip", "0.0.0.0",
         ], check=True, capture_output=True, text=True)
         temporal_started = True
 
