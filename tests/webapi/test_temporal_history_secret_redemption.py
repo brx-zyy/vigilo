@@ -13,23 +13,17 @@ import uuid
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from temporalio import workflow
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
+
+from tests.security.vigilo_synthetic_workflow import VigiloSyntheticSecretWorkflow
 
 from src.ai.envguard import strip_secret_env
 from src.webapi import secret_store
 from src.webapi.db import get_async_session
 from src.webapi.internal import create_internal_app
 from src.webapi.models import Job, Repository, Run, User, RUN_RUNNING
-
-
-@workflow.defn(name="VigiloSyntheticSecretWorkflow")
-class VigiloSyntheticSecretWorkflow:
-    @workflow.run
-    async def run(self, payload: dict) -> str:
-        return "completed"
 
 
 async def _new_run(session_maker) -> uuid.UUID:
