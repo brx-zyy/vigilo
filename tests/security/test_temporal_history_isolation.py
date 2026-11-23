@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 from temporalio import workflow
-from temporalio.client import WorkflowExecutionStatus
+from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 from temporalio.worker import Worker
 
@@ -47,7 +47,7 @@ async def test_peer_temporal_client_can_read_another_run_redemption_key():
 
             # A distinct client represents an agent process. No Vigilo JWT or
             # per-run redemption key is supplied to this client.
-            peer = await env.client.connect()
+            peer = await Client.connect(env.client.service_client.config.target_host)
             executions = [item async for item in peer.list_workflows(
                 'WorkflowType = "SyntheticSecretWorkflow"'
             )]
