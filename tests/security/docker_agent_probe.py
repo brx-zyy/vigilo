@@ -43,7 +43,7 @@ async def main() -> None:
     key = payload["secrets"]["key"]
 
     # The internal API base URL is deliberately scrubbed from the process
-    # environment. The agent reaches the listener through Docker DNS instead.
+    # environment. The agent reaches the published listener directly from its container network namespace.
     body = json.dumps({"key": key, "want": ["cookie_header"]}).encode()
     request = Request(
         f"http://127.0.0.1:{api_port}/internal/v1/runs/{victim_run_id}/secrets",
