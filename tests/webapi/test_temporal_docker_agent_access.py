@@ -116,6 +116,7 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
         result = subprocess.run(docker + [
             "run", "--rm", "--network", "host",
             "-e", f"TEMPORAL_ADDRESS=127.0.0.1:{temporal_port}",
+            "-e", "VIGILO_INTERNAL_API_URL=http://api:8081",
             "-v", f"{__import__('os').path.abspath(probe_path)}:/tmp/docker_agent_probe.py:ro",
             "--entrypoint", "python3", IMAGE,
             "/tmp/docker_agent_probe.py", str(victim_run),
