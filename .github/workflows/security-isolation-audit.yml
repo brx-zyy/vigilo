@@ -35,4 +35,4 @@ jobs:
           tests/webapi/test_multiuser_isolation_suite.py
           tests/security/test_temporal_history_isolation.py
           tests/webapi/test_temporal_history_secret_redemption.py
-          tests/security/test_temporal_docker_agent_access.py
+          tests/webapi/test_temporal_docker_agent_access.py
