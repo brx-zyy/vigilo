@@ -1,6 +1,3 @@
-pytest_plugins = ("tests.webapi.conftest",)
-
-
 """Docker-level proof: an agent in the Vigilo worker image can read and redeem
 another tenant's synthetic secret from Temporal workflow history.
 
@@ -8,6 +5,8 @@ Requires Docker and the audit image built from the repository's production
 Dockerfile (vigilo-worker-audit). No production credentials or services used.
 """
 from __future__ import annotations
+
+pytest_plugins = ("tests.webapi.conftest",)
 
 import asyncio
 import json
