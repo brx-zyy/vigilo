@@ -1,0 +1,33 @@
+name: Security isolation audit
+
+on:
+  push:
+    branches:
+      - security/audit-temporal-secret-isolation
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  webapi-security-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out audit branch
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Vigilo web API and test dependencies
+        run: python -m pip install -e ".[webapi,webapi-test]"
+      - name: Run secret, hardening, and tenant-isolation tests
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: >-
+          python -m pytest -q
+          tests/webapi/test_run_secrets_api.py
+          tests/webapi/test_security_hardening.py
+          tests/webapi/test_multiuser_isolation_suite.py
