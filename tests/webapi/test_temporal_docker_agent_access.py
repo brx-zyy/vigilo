@@ -12,7 +12,6 @@ import json
 import shutil
 import socket
 import subprocess
-import time
 import uuid
 
 import pytest
@@ -94,23 +93,6 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
             "--db-filename", "/home/temporal/temporal.db", "--ip", "0.0.0.0",
         ], check=True, capture_output=True, text=True)
         temporal_started = True
-
-        # Run the actual internal FastAPI route over HTTP on the host gateway.
-        async def override_session():
-            async with session_maker() as session:
-                yield session
-
-        app = create_internal_app()
-        app.dependency_overrides[get_async_session] = override_session
-        api_server = uvicorn.Server(uvicorn.Config(
-            app, host="0.0.0.0", port=API_PORT, log_level="error",
-        ))
-        api_task = asyncio.create_task(api_server.serve())
-        for _ in range(100):
-            if api_server.started:
-                break
-            await asyncio.sleep(0.1)
-        assert api_server.started, "synthetic internal API did not start"
 
         # Host-side setup client starts two runs on the isolated Temporal server.
         address = f"127.0.0.1:{temporal_port}"
