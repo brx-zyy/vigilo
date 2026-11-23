@@ -1,3 +1,6 @@
+pytest_plugins = ("tests.webapi.conftest",)
+
+
 """Docker-level proof: an agent in the Vigilo worker image can read and redeem
 another tenant's synthetic secret from Temporal workflow history.
 
