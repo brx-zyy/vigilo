@@ -15,7 +15,7 @@ import subprocess
 import uuid
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+import uvicorn
 from temporalio.client import Client
 
 from tests.security.vigilo_synthetic_workflow import VigiloSyntheticSecretWorkflow
@@ -84,10 +84,13 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
     temporal_name = f"vigilo-temporal-{uuid.uuid4().hex[:8]}"
     network = f"vigilo-audit-{uuid.uuid4().hex[:10]}"
     temporal_port = _free_port()
+    api_port = _free_port()
     docker = ["docker"]
     temporal_started = False
     network_created = False
     client = None
+    api_server = None
+    api_task = None
     try:
         subprocess.run(docker + ["network", "create", network], check=True,
                        capture_output=True, text=True)
@@ -96,7 +99,7 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
             "run", "-d", "--name", temporal_name, "--network", network,
             "--network-alias", "temporal", "-p", f"127.0.0.1:{temporal_port}:7233",
             TEMPORAL_IMAGE, "server", "start-dev", "--ip", "0.0.0.0",
-            "--db-filename", "/home/temporal/temporal.db", "--ip", "0.0.0.0",
+            "--db-filename", "/home/temporal/temporal.db",
         ], check=True, capture_output=True, text=True)
         temporal_started = True
 
@@ -118,14 +121,33 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
                 task_queue="vigilo-docker-agent-proof",
             )
 
+        # Expose the real internal API listener to the isolated Docker bridge.
+        # The worker container will reach it as "api" via Docker's host gateway.
+        async def override_session():
+            async with session_maker() as session:
+                yield session
+
+        app = create_internal_app()
+        app.dependency_overrides[get_async_session] = override_session
+        api_server = uvicorn.Server(uvicorn.Config(
+            app, host="0.0.0.0", port=api_port, log_level="error",
+        ))
+        api_task = asyncio.create_task(api_server.serve())
+        for _ in range(100):
+            if api_server.started:
+                break
+            await asyncio.sleep(0.1)
+        assert api_server.started, "synthetic internal API did not start"
+
         probe_path = "tests/security/docker_agent_probe.py"
         result = subprocess.run(docker + [
             "run", "--rm", "--network", network,
+            "--add-host", "api:host-gateway",
             "-e", "TEMPORAL_ADDRESS=temporal:7233",
             "-e", "VIGILO_INTERNAL_API_URL=http://api:8081",
             "-v", f"{__import__('os').path.abspath(probe_path)}:/tmp/docker_agent_probe.py:ro",
             "--entrypoint", "python3", IMAGE,
-            "/tmp/docker_agent_probe.py", str(victim_run),
+            "/tmp/docker_agent_probe.py", str(victim_run), str(api_port),
         ], capture_output=True, text=True, timeout=90)
         assert result.returncode == 0, (
             f"agent container failed ({result.returncode})\nstdout: {result.stdout}\nstderr: {result.stderr}"
@@ -137,28 +159,15 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
         assert proof["history_read"] is True
         assert proof["temporal_address_survived_envguard"] is True
         assert proof["internal_api_url_removed_by_envguard"] is True
-        assert proof["redeemed_key_from_history"] == victim_key
-
-        # Redeem the key extracted inside the real worker container against
-        # Vigilo's actual internal FastAPI endpoint and isolated test database.
-        async def override_session():
-            async with session_maker() as session:
-                yield session
-
-        app = create_internal_app()
-        app.dependency_overrides[get_async_session] = override_session
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://internal"
-        ) as internal:
-            response = await internal.post(
-                f"/internal/v1/runs/{victim_run}/secrets",
-                json={"key": proof["redeemed_key_from_history"], "want": ["cookie_header"]},
-            )
-        assert response.status_code == 200, response.text
-        assert response.json() == {
-            "secrets": {"cookie_header": "SYNTHETIC_VICTIM_COOKIE_DO_NOT_USE"}
+        assert proof["redemption_http_status"] == 200
+        assert proof["redeemed_secrets"] == {
+            "cookie_header": "SYNTHETIC_VICTIM_COOKIE_DO_NOT_USE"
         }
     finally:
+        if api_server:
+            api_server.should_exit = True
+        if api_task:
+            await asyncio.gather(api_task, return_exceptions=True)
         if temporal_started:
             subprocess.run(docker + ["rm", "-f", temporal_name], capture_output=True)
         if network_created:
