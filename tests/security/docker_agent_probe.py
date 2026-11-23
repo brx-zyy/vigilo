@@ -46,7 +46,7 @@ async def main() -> None:
     # environment. The agent reaches the listener through Docker DNS instead.
     body = json.dumps({"key": key, "want": ["cookie_header"]}).encode()
     request = Request(
-        f"http://api:{api_port}/internal/v1/runs/{victim_run_id}/secrets",
+        f"http://127.0.0.1:{api_port}/internal/v1/runs/{victim_run_id}/secrets",
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
