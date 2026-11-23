@@ -23,6 +23,8 @@ jobs:
           cache: pip
       - name: Install Vigilo web API and test dependencies
         run: python -m pip install -e ".[webapi,webapi-test]"
+      - name: Build the production Vigilo worker image for container proof
+        run: docker build --pull -t vigilo-worker-audit -f Dockerfile .
       - name: Run secret, hardening, and tenant-isolation tests
         env:
           PYTHONUNBUFFERED: "1"
@@ -33,3 +35,4 @@ jobs:
           tests/webapi/test_multiuser_isolation_suite.py
           tests/security/test_temporal_history_isolation.py
           tests/webapi/test_temporal_history_secret_redemption.py
+          tests/security/test_temporal_docker_agent_access.py
