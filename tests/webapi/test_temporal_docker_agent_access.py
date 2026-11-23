@@ -83,22 +83,16 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
             session, victim_run, {"cookie_header": "SYNTHETIC_VICTIM_COOKIE_DO_NOT_USE"}
         )
 
-    network = f"vigilo-audit-{uuid.uuid4().hex[:10]}"
     temporal_name = f"vigilo-temporal-{uuid.uuid4().hex[:8]}"
     temporal_port = _free_port()
     docker = ["docker"]
-    network_created = False
     temporal_started = False
     api_server = None
     api_task = None
     client = None
     try:
-        subprocess.run(docker + ["network", "create", network], check=True,
-                       capture_output=True, text=True)
-        network_created = True
         subprocess.run(docker + [
-            "run", "-d", "--name", temporal_name, "--network", network,
-            "--network-alias", "temporal", "-p", f"127.0.0.1:{temporal_port}:7233",
+            "run", "-d", "--name", temporal_name, "--network", "host",
             TEMPORAL_IMAGE, "server", "start-dev", "--db-filename",
             "/home/temporal/temporal.db", "--ip", "0.0.0.0",
         ], check=True, capture_output=True, text=True)
@@ -141,10 +135,9 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
 
         probe_path = "tests/security/docker_agent_probe.py"
         result = subprocess.run(docker + [
-            "run", "--rm", "--network", network,
-            "--add-host", "api:host-gateway",
-            "-e", "TEMPORAL_ADDRESS=temporal:7233",
-            "-e", "VIGILO_INTERNAL_API_URL=http://api:8081",
+            "run", "--rm", "--network", "host",
+            "-e", f"TEMPORAL_ADDRESS=127.0.0.1:{temporal_port}",
+            "-e", f"VIGILO_INTERNAL_API_URL=http://127.0.0.1:{API_PORT}",
             "-v", f"{__import__('os').path.abspath(probe_path)}:/tmp/docker_agent_probe.py:ro",
             "--entrypoint", "python3", IMAGE,
             "/tmp/docker_agent_probe.py", str(victim_run), str(API_PORT),
@@ -167,9 +160,5 @@ async def test_real_worker_container_can_redeem_peer_run_secret(session_maker):
         api_server and setattr(api_server, "should_exit", True)
         if api_task:
             await asyncio.gather(api_task, return_exceptions=True)
-        if client:
-            await client.service_client.close()
         if temporal_started:
             subprocess.run(docker + ["rm", "-f", temporal_name], capture_output=True)
-        if network_created:
-            subprocess.run(docker + ["network", "rm", network], capture_output=True)
