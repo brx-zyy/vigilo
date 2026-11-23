@@ -31,3 +31,4 @@ jobs:
           tests/webapi/test_run_secrets_api.py
           tests/webapi/test_security_hardening.py
           tests/webapi/test_multiuser_isolation_suite.py
+          tests/security/test_temporal_history_isolation.py
